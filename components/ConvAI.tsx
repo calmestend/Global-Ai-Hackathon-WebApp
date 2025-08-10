@@ -242,7 +242,7 @@ export function ConvAI() {
 		setRoute("result");
 
 		// Enviar el resumen completo a la IA como mensaje del usuario
-		conversation.sendUserMessage(workoutMessage);
+		(conversation as any).sendContextualUpdate?.(`workout_result: ${workoutMessage}`);
 	}, [conversation]);
 
 	async function startConversation() {
