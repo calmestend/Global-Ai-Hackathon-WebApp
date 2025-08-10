@@ -45,6 +45,7 @@ export function ConvAI() {
 	// Modals
 	const [showWorkoutModal, setShowWorkoutModal] = useState(false);
 	const [showResultModal, setShowResultModal] = useState(false);
+	const [showPushupsModal, setShowPushupsModal] = useState(false);
 
 	// Control de modales según la ruta
 	useEffect(() => {
@@ -213,6 +214,18 @@ export function ConvAI() {
 						<p>Weight: {userWeight ?? "Not provided"}</p>
 						<p>Height: {userHeight ?? "Not provided"}</p>
 						<p>Sex: {userSex ?? "Not provided"}</p>
+					</div>
+				</DialogContent>
+			</Dialog>
+
+			{/* Pushups Modal */}
+			<Dialog open={showPushupsModal} onOpenChange={setShowPushupsModal}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Push-ups Session</DialogTitle>
+					</DialogHeader>
+					<div className="text-center">
+						<p>Doing pushups</p>
 					</div>
 				</DialogContent>
 			</Dialog>
