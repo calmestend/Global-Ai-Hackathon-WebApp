@@ -20,15 +20,13 @@ export default function RootLayout({children}: Readonly<{ children: React.ReactN
             >
                 <div className={"flex"}>
                     <Link href={"/"} prefetch={true}>
-                        <ElevenLabsLogo
-                            className={"h-[15px] w-auto hover:text-gray-500"}
-                        />
+                       <h1 className="text-2xl font-bold text-white">Zentry.sh</h1>
                     </Link>
                 </div>
 
                 <div className={"flex gap-4 justify-end"}>
                     <Link
-                        href="https://github.com/jonatanvm/convai-demo"
+                        href="https://github.com/jonatanvm/convai-https://github.com/calmestend/Global-Ai-Hackathon-WebApp/tree/main"
                         target="_blank"
                         rel="noopener noreferrer"
                         className={"py-0.5"}
