@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 type Props = {
 	pushups_goal: number;
 	time_per_pushup: number;
-	onWorkoutComplete?: (result: { reps: number, timeElapsed: number, success: boolean }) => void;
+	onWorkoutComplete?: (result: { reps: number, timeElapsed: number, success: boolean, workoutSummary?: any }) => void;
 };
 
 export default function Pushups({ pushups_goal, time_per_pushup, onWorkoutComplete }: Props) {
@@ -13,6 +13,10 @@ export default function Pushups({ pushups_goal, time_per_pushup, onWorkoutComple
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const workoutManagerRef = useRef<any>(null);
+	const workoutStartTimeRef = useRef<number>(0);
+	const pushupTimesRef = useRef<number[]>([]);
+	const lastPushupTimeRef = useRef<number>(0);
+	const goalReachedRef = useRef<boolean>(false);
 
 	const [reps, setReps] = useState(0);
 	const [currentStage, setCurrentStage] = useState('Preparando...');
@@ -27,6 +31,7 @@ export default function Pushups({ pushups_goal, time_per_pushup, onWorkoutComple
 		video: HTMLVideoElement | null = null;
 		canvas: HTMLCanvasElement | null = null;
 		ctx: CanvasRenderingContext2D | null = null;
+		isRunning = false;
 
 		calculateAngle(a: number[], b: number[], c: number[]) {
 			const radians = Math.atan2(c[1] - b[1], c[0] - b[0]) -
@@ -50,7 +55,31 @@ export default function Pushups({ pushups_goal, time_per_pushup, onWorkoutComple
 			if (!s || !e || !w) return { angle: 0, stage: this.stage, counter: this.counter };
 			const angle = this.calculateAngle(s, e, w);
 			if (angle > 160) this.stage = "UP";
-			if (angle < 50 && this.stage === 'UP') { this.stage = "DOWN"; this.counter++; }
+			if (angle < 50 && this.stage === 'UP') {
+				this.stage = "DOWN";
+				this.counter++;
+
+				// Registrar tiempo de cada push-up
+				const currentTime = Date.now();
+				if (lastPushupTimeRef.current > 0) {
+					const timeBetweenPushups = (currentTime - lastPushupTimeRef.current) / 1000;
+					pushupTimesRef.current.push(timeBetweenPushups);
+				} else {
+					// Primer push-up desde el inicio del workout
+					const timeFromStart = (currentTime - workoutStartTimeRef.current) / 1000;
+					pushupTimesRef.current.push(timeFromStart);
+				}
+				lastPushupTimeRef.current = currentTime;
+
+				// Verificar si se alcanzó la meta
+				if (this.counter >= pushups_goal && !goalReachedRef.current) {
+					goalReachedRef.current = true;
+					console.log(`🎯 Meta alcanzada! ${this.counter} push-ups completados`);
+					setTimeout(() => {
+						finishWorkout();
+					}, 1000);
+				}
+			}
 			return { angle, stage: this.stage, counter: this.counter };
 		}
 
@@ -147,7 +176,7 @@ export default function Pushups({ pushups_goal, time_per_pushup, onWorkoutComple
 		}
 
 		async processVideo() {
-			if (!this.poseLandmarker || !this.video || !this.canvas || !this.ctx) return;
+			if (!this.poseLandmarker || !this.video || !this.canvas || !this.ctx || !this.isRunning) return;
 
 			try {
 				const results = this.poseLandmarker.detectForVideo(this.video, performance.now());
@@ -165,11 +194,15 @@ export default function Pushups({ pushups_goal, time_per_pushup, onWorkoutComple
 				console.error('Error:', error);
 			}
 
-			requestAnimationFrame(() => this.processVideo());
+			// SIEMPRE continuar el bucle si isRunning es true
+			if (this.isRunning) {
+				requestAnimationFrame(() => this.processVideo());
+			}
 		}
 
 		async start() {
 			try {
+				this.isRunning = true;
 				await this.initializePose();
 				await this.initializeCamera();
 				this.processVideo();
@@ -177,7 +210,62 @@ export default function Pushups({ pushups_goal, time_per_pushup, onWorkoutComple
 				console.error('Error:', error);
 			}
 		}
+
+		stop() {
+			this.isRunning = false;
+		}
 	}
+
+	const finishWorkout = useCallback(() => {
+		const workoutManager = workoutManagerRef.current;
+		if (!workoutManager) return;
+
+		// Detener el procesamiento de video
+		workoutManager.stop();
+
+		const totalTimeElapsed = (Date.now() - workoutStartTimeRef.current) / 1000;
+		const completedReps = workoutManager.counter;
+		const success = completedReps >= pushups_goal;
+
+		// Calcular estadísticas
+		const averageTimePerPushup = pushupTimesRef.current.length > 0
+			? pushupTimesRef.current.reduce((a, b) => a + b, 0) / pushupTimesRef.current.length
+			: 0;
+
+		// Crear el resumen JSON y mostrarlo en consola
+		const workoutSummary = {
+			workout_summary: {
+				goal: pushups_goal,
+				completed: completedReps,
+				success: success,
+				completion_percentage: Math.round((completedReps / pushups_goal) * 100),
+				total_time_seconds: Math.round(totalTimeElapsed * 100) / 100,
+				average_time_per_pushup: Math.round(averageTimePerPushup * 100) / 100,
+				individual_pushup_times: pushupTimesRef.current.map((time, index) => ({
+					pushup: index + 1,
+					time_seconds: Math.round(time * 100) / 100
+				})),
+				status: success ? "✅ OBJETIVO COMPLETADO" : "⚠️ OBJETIVO PARCIAL",
+				performance: completedReps > pushups_goal ? "🎯 SUPERADO" :
+					completedReps === pushups_goal ? "🎯 EXACTO" :
+						completedReps >= pushups_goal * 0.8 ? "👍 BUENO" : "💪 CONTINÚA"
+			}
+		};
+
+		console.log("🏃‍♂️ RESUMEN DE WORKOUT:");
+		console.log(JSON.stringify(workoutSummary, null, 2));
+
+		setStage('result');
+
+		if (onWorkoutComplete) {
+			onWorkoutComplete({
+				reps: completedReps,
+				timeElapsed: Math.round(totalTimeElapsed),
+				success,
+				workoutSummary
+			});
+		}
+	}, [pushups_goal, onWorkoutComplete]);
 
 	const handleIniciar = useCallback(() => {
 		setStage('countdown');
@@ -193,38 +281,23 @@ export default function Pushups({ pushups_goal, time_per_pushup, onWorkoutComple
 				clearInterval(interval);
 				setStage('workout');
 
+				// Resetear referencias
+				goalReachedRef.current = false;
+				pushupTimesRef.current = [];
+				lastPushupTimeRef.current = 0;
+				workoutStartTimeRef.current = Date.now();
+
 				const workoutManager = new WorkoutManager();
 				workoutManagerRef.current = workoutManager;
 				workoutManager.start();
-
-				setTimeout(() => {
-					const hechas = workoutManager.counter;
-					let success = false;
-
-					if (hechas > pushups_goal) {
-						console.log("sucess, better than expected")
-						success = true;
-					} else if (hechas === pushups_goal) {
-						console.log("success")
-						success = true;
-					} else {
-						console.log("unsuccessfully")
-						success = false;
-					}
-
-					setStage('result');
-
-					if (onWorkoutComplete) {
-						onWorkoutComplete({
-							reps: hechas,
-							timeElapsed: time_per_pushup,
-							success
-						});
-					}
-				}, time_per_pushup * 1000);
 			}
 		}, 1000);
-	}, [pushups_goal, time_per_pushup, onWorkoutComplete]);
+	}, []);
+
+	// Botón manual para finalizar el workout
+	const handleFinishWorkout = useCallback(() => {
+		finishWorkout();
+	}, [finishWorkout]);
 
 	return (
 		<div className="w-full max-w-4xl mx-auto">
@@ -235,8 +308,8 @@ export default function Pushups({ pushups_goal, time_per_pushup, onWorkoutComple
 						<span className="text-2xl font-bold text-blue-600">{pushups_goal}</span>
 					</div>
 					<div className="mb-6">
-						<label className="block text-lg mb-2">Tiempo (segundos):</label>
-						<span className="text-2xl font-bold text-blue-600">{time_per_pushup}</span>
+						<label className="block text-lg mb-2">Tiempo estimado por push-up:</label>
+						<span className="text-2xl font-bold text-blue-600">{time_per_pushup}s</span>
 					</div>
 					<button
 						onClick={handleIniciar}
@@ -274,7 +347,7 @@ export default function Pushups({ pushups_goal, time_per_pushup, onWorkoutComple
 					<>
 						<div className="absolute top-4 left-4 bg-black bg-opacity-70 text-white p-3 rounded">
 							<div className="text-xs opacity-80">REPS</div>
-							<div className="text-2xl font-bold">{reps}</div>
+							<div className="text-2xl font-bold">{reps}/{pushups_goal}</div>
 						</div>
 
 						<div className="absolute top-4 right-4 bg-black bg-opacity-70 text-white p-3 rounded">
@@ -288,19 +361,40 @@ export default function Pushups({ pushups_goal, time_per_pushup, onWorkoutComple
 						</div>
 
 						<div className="absolute bottom-4 right-4 bg-black bg-opacity-70 text-white p-3 rounded">
-							<div className="text-xs opacity-80">PROGRESO</div>
-							<div className="text-lg">{Math.floor(progress)}%</div>
+							<div className="text-xs opacity-80">PROGRESO META</div>
+							<div className="text-lg">{Math.floor((reps / pushups_goal) * 100)}%</div>
+						</div>
+
+						{/* Botón manual para terminar */}
+						<div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+							<button
+								onClick={handleFinishWorkout}
+								className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded opacity-20 hover:opacity-100 transition-opacity"
+							>
+								Terminar Workout
+							</button>
 						</div>
 
 						<div className="absolute bottom-0 left-0 w-full h-2 bg-gray-800 bg-opacity-70">
 							<div
 								className="h-full bg-green-500 transition-all duration-200"
-								style={{ width: `${progress}%` }}
+								style={{ width: `${Math.min(100, (reps / pushups_goal) * 100)}%` }}
 							/>
 						</div>
 					</>
 				)}
 			</div>
+
+			{stage === 'result' && (
+				<div className="text-center py-8 bg-white rounded-lg shadow-lg">
+					<h3 className="text-2xl font-bold mb-4">¡Workout Completado!</h3>
+					<p className="text-lg mb-2">Completaste {reps} de {pushups_goal} push-ups</p>
+					<p className="text-sm text-gray-600">Tiempo total: {timeElapsed}</p>
+					<p className="text-sm text-gray-500 mt-2">
+						Revisa la consola para ver el resumen detallado 📊
+					</p>
+				</div>
+			)}
 		</div>
 	);
 }
