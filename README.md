@@ -1,4 +1,7 @@
-## Conversational AI Demo
+## WorkIT.sh AI
+
+
+## Project Description
 
 ## Setup
 
@@ -7,6 +10,16 @@ Set up the environment variables:
 ```bash
 cp .env.example .env
 ```
+
+Env Variables:
+```bash 
+# ElevenLabs Conversational AI Agent ID
+AGENT_ID=""
+
+# ElevenLabs API Key
+ELEVENLABS_API_KEY=""
+```
+
 
 Follow [this guide](https://elevenlabs.io/docs/conversational-ai/docs/agent-setup) to configure your agent and get your API key and set them in the `.env` file.
 
