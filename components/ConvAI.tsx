@@ -13,6 +13,9 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import Pushups from "./pushups";
+import { WorkoutModal } from "./ui/WorkoutModal";
+import { ResultModal } from "./ui/ResultModal";
+import { Orb } from "./Orb";
 
 async function requestMicrophonePermission() {
 	try {
@@ -242,7 +245,7 @@ export function ConvAI() {
 		setRoute("result");
 
 		// Enviar el resumen completo a la IA como mensaje del usuario
-		conversation.sendUserMessage(workoutMessage);
+		// conversation.sendUserMessage(workoutMessage);
 	}, [conversation]);
 
 	async function startConversation() {
@@ -280,16 +283,7 @@ export function ConvAI() {
 								Route: {route} | Workout Active: {workoutActive ? 'Yes' : 'No'}
 							</div>
 
-							<div
-								className={cn(
-									"orb my-16 mx-12",
-									conversation.status === "connected" && conversation.isSpeaking
-										? "orb-active animate-orb"
-										: conversation.status === "connected"
-											? "animate-orb-slow orb-inactive"
-											: "orb-inactive"
-								)}
-							></div>
+							<Orb />
 
 							<Button
 								variant={"outline"}
@@ -315,21 +309,14 @@ export function ConvAI() {
 			</div>
 
 			{/* Workout Modal - Solo muestra datos del usuario */}
-			<Dialog open={showWorkoutModal} onOpenChange={setShowWorkoutModal}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>User Data</DialogTitle>
-					</DialogHeader>
-					<div className="space-y-2">
-						<p>Age: {userAge ?? "Not provided"}</p>
-						<p>Weight: {userWeight ?? "Not provided"}</p>
-						<p>Height: {userHeight ?? "Not provided"}</p>
-						<p>Sex: {userSex ?? "Not provided"}</p>
-						<p>Push-up Goal: {pushupGoal ?? "Not provided"}</p>
-						<p>Time per Push-up: {timePerPushup ? `${timePerPushup} seconds` : "Not provided"}</p>
-					</div>
-				</DialogContent>
-			</Dialog>
+			<WorkoutModal
+					open={showWorkoutModal}
+					onOpenChange={setShowWorkoutModal}
+					userAge={userAge}
+					userWeight={userWeight}
+					userHeight={userHeight}
+					userSex={userSex}
+				/>
 
 			<Dialog open={showPushupsModal} onOpenChange={setShowPushupsModal}>
 				<DialogContent className="max-w-4xl">
@@ -354,14 +341,11 @@ export function ConvAI() {
 			</Dialog>
 
 			{/* Result Modal */}
-			<Dialog open={showResultModal} onOpenChange={setShowResultModal}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Workout Result</DialogTitle>
-					</DialogHeader>
-					<p>{workoutResult || "No result provided"}</p>
-				</DialogContent>
-			</Dialog>
+			<ResultModal
+					open={showResultModal}
+					onOpenChange={setShowResultModal}
+					result={workoutResult}
+				/>
 		</>
 	);
 }
