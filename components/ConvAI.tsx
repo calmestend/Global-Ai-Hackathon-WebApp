@@ -12,6 +12,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import Pushups from "./pushups";
 
 async function requestMicrophonePermission() {
 	try {
@@ -41,6 +42,8 @@ export function ConvAI() {
 	const [userWeight, setUserWeight] = useState<string | null>(null);
 	const [userHeight, setUserHeight] = useState<string | null>(null);
 	const [userSex, setUserSex] = useState<string | null>(null);
+	const [pushupGoal, setPushupGoal] = useState<number | null>(null);
+	const [timePerPushup, setTimePerPushup] = useState<number | null>(null);
 
 	// Modals
 	const [showWorkoutModal, setShowWorkoutModal] = useState(false);
@@ -52,12 +55,15 @@ export function ConvAI() {
 		if (route === "workout") {
 			setShowWorkoutModal(true);
 			setShowResultModal(false);
+			setShowPushupsModal(true); // Open push-ups modal when workout starts
 		} else if (route === "result") {
 			setShowWorkoutModal(false);
 			setShowResultModal(true);
+			setShowPushupsModal(false);
 		} else if (route === "home") {
 			setShowWorkoutModal(false);
 			setShowResultModal(false);
+			setShowPushupsModal(false);
 		}
 	}, [route]);
 
@@ -82,6 +88,14 @@ export function ConvAI() {
 				if (result.message.includes("ending workout")) {
 					setRoute("result");
 					(conversation as any).sendContextualUpdate?.(`route: result`);
+				}
+
+				// Detección estricta de desconexión - solo cuando AI dice la frase exacta
+				if (result.message.includes("ending session")) {
+					setRoute("home");
+					setTimeout(() => {
+						conversation.endSession();
+					}, 1000);
 				}
 			}
 
@@ -125,6 +139,18 @@ export function ConvAI() {
 					userUpdated = true;
 				}
 
+				const pushupGoalMatch = result.message.match(/\b(\d{1,3})\s*(push[- ]?ups|pushups|reps)\b/i);
+				if (pushupGoalMatch) {
+					setPushupGoal(Number(pushupGoalMatch[1]));
+					userUpdated = true;
+				}
+
+				const timePerPushupMatch = result.message.match(/\b(\d{1,3})\s*(seconds|secs)\b/i);
+				if (timePerPushupMatch) {
+					setTimePerPushup(Number(timePerPushupMatch[1]));
+					userUpdated = true;
+				}
+
 				if (userUpdated) {
 					(conversation as any).sendContextualUpdate?.(
 						`route: ${route}\n` +
@@ -132,6 +158,8 @@ export function ConvAI() {
 						(userWeight ? `user_weight: ${userWeight}\n` : "") +
 						(userHeight ? `user_height: ${userHeight}\n` : "") +
 						(userSex ? `user_sex: ${userSex}\n` : "") +
+						(pushupGoal ? `pushup_goal: ${pushupGoal}\n` : "") +
+						(timePerPushup ? `time_per_pushup: ${timePerPushup}\n` : "") +
 						(workoutResult ? `workout_result: ${workoutResult}` : "")
 					);
 				}
@@ -203,6 +231,8 @@ export function ConvAI() {
 				</Card>
 			</div>
 
+			<Pushups pushups_goal={pushupGoal ?? 5} time_per_pushup={timePerPushup ?? 60} />
+
 			{/* Workout Modal */}
 			<Dialog open={showWorkoutModal} onOpenChange={setShowWorkoutModal}>
 				<DialogContent>
@@ -214,6 +244,8 @@ export function ConvAI() {
 						<p>Weight: {userWeight ?? "Not provided"}</p>
 						<p>Height: {userHeight ?? "Not provided"}</p>
 						<p>Sex: {userSex ?? "Not provided"}</p>
+						<p>Push-up Goal: {pushupGoal ?? "Not provided"}</p>
+						<p>Time per Push-up: {timePerPushup ? `${timePerPushup} seconds` : "Not provided"}</p>
 					</div>
 				</DialogContent>
 			</Dialog>
@@ -225,7 +257,7 @@ export function ConvAI() {
 						<DialogTitle>Push-ups Session</DialogTitle>
 					</DialogHeader>
 					<div className="text-center">
-						<p>Doing pushups</p>
+						<p>Doing push-ups: Aim for {pushupGoal ?? 5} push-ups at {timePerPushup ?? 30} seconds each</p>
 					</div>
 				</DialogContent>
 			</Dialog>
